@@ -1,78 +1,116 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const connectDB = require('./config/db');
-const blogRoutes = require('./routes/blogRoutes');
-const trackingRoutes = require('./routes/trackingRoutes'); // ✅ Import tracking routes
-const morgan = require('morgan');
-const winston = require('winston'); // ✅ Add winston
+// backend/server.js (updated CORS section)
+const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const connectDB = require("./config/db");
+const morgan = require("morgan");
+const path = require("path");
+const fs = require("fs");
 
+// ✅ Load environment variables
 dotenv.config();
 
+// ✅ Initialize express app
 const app = express();
 
-// Setup winston logger
-const logger = winston.createLogger({
-    level: 'info', // Set the log level
-    transports: [
-        new winston.transports.Console({ format: winston.format.simple() }), // Console transport
-        new winston.transports.File({ filename: 'server.log' }) // File transport
-    ],
+// ✅ Log environment and MongoDB URI
+console.log(`🛠️ Starting server.js - NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`🔗 Loaded MONGO_URI: ${process.env.MONGO_URI}`);
+
+// ✅ Ensure uploads directories exist
+const baseUploadDir = path.join(__dirname, "uploads");
+const blogUploadDir = path.join(baseUploadDir, "blogs");
+const videoUploadDir = path.join(baseUploadDir, "videos");
+
+[baseUploadDir, blogUploadDir, videoUploadDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`📂 Created upload directory: ${dir}`);
+    }
 });
 
+// ✅ Connect to MongoDB
 connectDB()
-    .then(() => logger.info('Connected to MongoDB')) // Replaced console.log with logger
+    .then(() => {
+        console.log("✅ MongoDB Connected");
+    })
     .catch((err) => {
-        logger.error('[MongoDB Connection Error]:', err.message); // Replaced console.error with logger
-        process.exit(1);
+        console.error("❌ MongoDB Connection Error:", err.message);
+        if (process.env.NODE_ENV !== "test") {
+            process.exit(1);
+        }
     });
 
+// ✅ Middleware
 app.use(express.json());
+app.use(morgan("dev"));
 
-app.use(
-    cors({
-        origin: '*',
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-);
+// ✅ Enhanced CORS handling for development and production
+const allowedOrigins = [
+    "http://localhost:5173",  // Vite frontend (development)
+    "http://localhost:3000",  // Optional, if you have another frontend
+    process.env.FRONTEND_URL  // Production frontend URL (e.g., "https://sports-gateway.com")
+].filter(Boolean); // Remove undefined/null values
 
-app.use('/uploads', express.static('uploads'));
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Explicitly allow methods
+    allowedHeaders: ['Content-Type', 'Authorization'] // Explicitly allow headers
+}));
 
-// Global middleware log with winston
+// ✅ Static file serving for uploads (serves `/uploads` folder)
+app.use("/uploads", express.static(baseUploadDir));
+
+// ✅ Debug Logger - Logs incoming requests
 app.use((req, res, next) => {
-    logger.info(`[Global Log] Method: ${req.method}, URL: ${req.originalUrl}, Time: ${new Date().toISOString()}`);
+    console.log(`🔎 Incoming request: ${req.method} ${req.originalUrl}`);
     next();
 });
 
-// Use morgan for HTTP request logging
-app.use(morgan('dev'));
+// ✅ Health Check Endpoint
+app.get("/api/health", (req, res) => res.json({ status: "Backend running!" }));
 
-app.get('/', (req, res) => {
-    res.send('Sports Blog Backend is running!');
+// ✅ Import and Attach Routes
+const fetchBlogRoute = require("./routes/fetchBlogRoute");
+const fetchBlogsByCategoryRoute = require("./routes/fetchBlogsByCategoryRoute");
+const createBlogRoute = require("./routes/createBlogRoute");
+const updateBlogRoute = require("./routes/updateBlogRoute");
+const deleteBlogRoute = require("./routes/deleteBlogRoute");
+const featureBlogRoute = require("./routes/featureBlogRoute");
+const uploadRoute = require("./routes/uploadRoute");
+
+app.use("/api/blogs", fetchBlogRoute);
+app.use("/api/blogs", fetchBlogsByCategoryRoute);
+app.use("/api/blogs", createBlogRoute);
+app.use("/api/blogs", updateBlogRoute);
+app.use("/api/blogs", deleteBlogRoute);
+app.use("/api/blogs", featureBlogRoute);
+app.use("/api/upload", uploadRoute);
+
+// ✅ Global 404 Handler
+app.use((req, res) => {
+    console.error(`❌ Route Not Found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: "Route Not Found" });
 });
 
-// ✅ Mount routes
-app.use('/api/blogs', blogRoutes);
-app.use('/api/analytics', trackingRoutes); // ✅ Analytics routes are now active
-
-app.use((req, res, next) => {
-    const error = new Error(`Not Found - ${req.originalUrl}`);
-    logger.error(`[Route Error]: ${req.method} ${req.originalUrl} - Not Found`); // Log not found error
-    res.status(404);
-    next(error);
-});
-
+// ✅ Global Error Handler
 app.use((err, req, res, next) => {
-    logger.error(`[Error Handler]: ${req.method} ${req.originalUrl} - ${err.message}`); // Log errors
-    if (err.stack) {
-        logger.error(`[Stack Trace]: ${err.stack}`); // Log stack trace if available
-    }
-    res.status(err.status || 500).json({
-        message: err.message,
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    });
+    console.error(`❌ Global Error Handler: ${err.message}`);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
 });
 
+// ✅ Start Server (Only if Not in Test Mode)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => logger.info(`Server running on port ${PORT}`)); // Log server startup
+if (process.env.NODE_ENV !== "test") {
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}
+
+// ✅ Export for Testing
+module.exports = app;
