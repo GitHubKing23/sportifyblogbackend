@@ -1,13 +1,22 @@
 const request = require("supertest");
-const { app } = require("../server"); // ✅ Import Express App
+const app = require("../server"); // ✅ Import Express App
 const Blog = require("../models/Blog");
+const mongoose = require("mongoose");
 
 describe("📝 Blog API Tests", () => {
     let blogId;
 
-    // ✅ Ensure Clean Database Before Each Test
-    beforeEach(async () => {
-        await Blog.deleteMany({});
+    // ✅ Connect to Test DB before running tests
+    beforeAll(async () => {
+        await mongoose.connect(process.env.MONGO_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
+    });
+
+    // ✅ Cleanup after tests
+    afterAll(async () => {
+        await mongoose.connection.close();
     });
 
     // ✅ Test Creating a Blog
@@ -49,7 +58,10 @@ describe("📝 Blog API Tests", () => {
     test("🔹 Update a blog", async () => {
         const res = await request(app)
             .put(`/api/blogs/${blogId}`)
-            .send({ title: "Updated Test Blog", category: "NFL" });
+            .send({
+                title: "Updated Test Blog",
+                category: "NFL",
+            });
 
         expect(res.status).toBe(200);
         expect(res.body.blog.title).toBe("Updated Test Blog");
@@ -61,6 +73,7 @@ describe("📝 Blog API Tests", () => {
 
         expect(res.status).toBe(200);
         expect(res.body.blog).toHaveProperty("featured");
+        expect(typeof res.body.blog.featured).toBe("boolean");
     });
 
     // ✅ Test Deleting a Blog
@@ -76,4 +89,5 @@ describe("📝 Blog API Tests", () => {
         const res = await request(app).get(`/api/blogs/${blogId}`);
         expect(res.status).toBe(404);
     });
+
 });
