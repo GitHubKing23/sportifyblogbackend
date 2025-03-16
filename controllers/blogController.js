@@ -18,12 +18,15 @@ const fetchAllBlogs = async (req, res) => {
         console.log("🔍 Fetching all blogs from MongoDB...");
         const blogs = await Blog.find().sort({ createdAt: -1 });
 
-        console.log(`✅ Found ${blogs.length} blogs.`);
+        console.log(`✅ Found ${blogs.length} blogs. IDs:`, blogs.map(blog => blog._id.toString()));
         disableCache(res);
         res.status(200).json(blogs);
     } catch (error) {
-        console.error("❌ Error fetching all blogs:", error);
-        res.status(500).json({ error: "Failed to fetch blogs" });
+        console.error("❌ Error fetching all blogs:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to fetch blogs", details: error.message });
     }
 };
 
@@ -36,16 +39,24 @@ const fetchBlog = async (req, res) => {
         console.log(`🔍 Fetching blog by ID: ${id}`);
 
         if (!id) {
+            console.warn("⚠️ Blog ID is missing");
             return res.status(400).json({ error: "Blog ID is required" });
+        }
+
+        // Validate ID length (MongoDB ObjectId should be 24 characters)
+        if (id.length !== 24) {
+            console.warn(`⚠️ Invalid ID length (expected 24 characters): ${id}`);
+            return res.status(400).json({ error: "Invalid blog ID length (must be 24 characters)" });
         }
 
         // Validate if the ID is a valid ObjectId
         let blog;
         if (mongoose.Types.ObjectId.isValid(id)) {
+            console.log(`✅ Valid ObjectId: ${id}`);
             blog = await Blog.findById(id);
         } else {
-            // Fallback to findOne with string _id if ObjectId is invalid
-            blog = await Blog.findOne({ _id: id });
+            console.warn(`⚠️ Invalid ObjectId format: ${id}`);
+            return res.status(400).json({ error: "Invalid blog ID format" });
         }
 
         if (!blog) {
@@ -57,8 +68,12 @@ const fetchBlog = async (req, res) => {
         disableCache(res);
         res.status(200).json(blog);
     } catch (error) {
-        console.error("❌ Error fetching blog:", error);
-        res.status(500).json({ error: "Failed to fetch blog" });
+        console.error("❌ Detailed error fetching blog:", {
+            message: error.message,
+            stack: error.stack,
+            id: req.params.id,
+        });
+        res.status(500).json({ error: "Failed to fetch blog", details: error.message });
     }
 };
 
@@ -95,8 +110,11 @@ const fetchBlogsByCategory = async (req, res) => {
             others: blogs.filter(blog => !blog.featured)
         });
     } catch (error) {
-        console.error("❌ Error fetching blogs by category:", error);
-        res.status(500).json({ error: "Failed to fetch blogs by category" });
+        console.error("❌ Error fetching blogs by category:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to fetch blogs by category", details: error.message });
     }
 };
 
@@ -118,8 +136,11 @@ const fetchFeaturedBlogs = async (req, res) => {
         disableCache(res);
         res.status(200).json(featuredBlogs);
     } catch (error) {
-        console.error("❌ Error fetching featured blogs:", error);
-        res.status(500).json({ error: "Failed to fetch featured blogs" });
+        console.error("❌ Error fetching featured blogs:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to fetch featured blogs", details: error.message });
     }
 };
 
@@ -136,8 +157,11 @@ const createBlog = async (req, res) => {
         disableCache(res);
         res.status(201).json({ message: "Blog created successfully", blog: newBlog });
     } catch (error) {
-        console.error("❌ Error creating blog:", error);
-        res.status(500).json({ error: "Failed to create blog" });
+        console.error("❌ Error creating blog:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to create blog", details: error.message });
     }
 };
 
@@ -160,8 +184,11 @@ const updateBlog = async (req, res) => {
         disableCache(res);
         res.status(200).json({ message: "Blog updated successfully", blog: updatedBlog });
     } catch (error) {
-        console.error("❌ Error updating blog:", error);
-        res.status(500).json({ error: "Failed to update blog" });
+        console.error("❌ Error updating blog:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to update blog", details: error.message });
     }
 };
 
@@ -184,8 +211,11 @@ const deleteBlog = async (req, res) => {
         disableCache(res);
         res.status(200).json({ message: "Blog deleted successfully" });
     } catch (error) {
-        console.error("❌ Error deleting blog:", error);
-        res.status(500).json({ error: "Failed to delete blog" });
+        console.error("❌ Error deleting blog:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to delete blog", details: error.message });
     }
 };
 
@@ -210,8 +240,11 @@ const toggleFeaturedBlog = async (req, res) => {
         disableCache(res);
         res.status(200).json({ message: `Blog ${blog.featured ? "featured" : "unfeatured"} successfully`, blog });
     } catch (error) {
-        console.error("❌ Error toggling featured status:", error);
-        res.status(500).json({ error: "Failed to toggle featured status" });
+        console.error("❌ Error toggling featured status:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to toggle featured status", details: error.message });
     }
 };
 
@@ -238,8 +271,11 @@ const fetchPaginatedBlogs = async (req, res) => {
             totalPages: Math.ceil(totalBlogs / limit),
         });
     } catch (error) {
-        console.error("❌ Error fetching paginated blogs:", error);
-        res.status(500).json({ error: "Failed to fetch blogs with pagination" });
+        console.error("❌ Error fetching paginated blogs:", {
+            message: error.message,
+            stack: error.stack,
+        });
+        res.status(500).json({ error: "Failed to fetch blogs with pagination", details: error.message });
     }
 };
 

@@ -6,7 +6,7 @@ const connectDB = async () => {
   console.log("🔗 MONGO_URI:", process.env.MONGO_URI);
 
   if (!process.env.MONGO_URI) {
-    console.error("❌ MONGO_URI is not defined! Make sure .env or .env.test is loaded.");
+    console.error("❌ MONGO_URI is not defined! Make sure .env or .env.production is loaded.");
     if (process.env.NODE_ENV !== "test") {
       process.exit(1);
     }
@@ -15,8 +15,7 @@ const connectDB = async () => {
 
   try {
     await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Prevent infinite hanging if MongoDB is unreachable
     });
     console.log("✅ MongoDB Connected Successfully!");
   } catch (error) {
