@@ -13,7 +13,7 @@ dotenv.config({
 
 const app = express();
 
-// Connect to MongoDB
+// ✅ Connect to MongoDB
 connectDB()
   .then(() => console.log("✅ MongoDB Connected Successfully"))
   .catch((err) => {
@@ -24,8 +24,10 @@ connectDB()
 app.use(express.json());
 app.use(morgan("dev"));
 
-// Optimized CORS
+// ✅ Optimized CORS Configuration
 const allowedOrigins = [
+  "https://sportifyinsider.com",  // Frontend domain
+  "https://api.sportifyinsider.com", // API subdomain
   "http://localhost:5173",
   "http://localhost:3001",
   "http://localhost:3000",
@@ -38,7 +40,7 @@ app.use(cors({
   credentials: true,
 }));
 
-// Disable caching globally
+// ✅ Disable caching globally
 app.use((req, res, next) => {
   res.set("Cache-Control", "no-cache, no-store, must-revalidate");
   res.set("Pragma", "no-cache");
@@ -46,14 +48,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Static file serving
+// ✅ Serve static files (e.g., uploads)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Routes
+// ✅ API Routes
 app.use("/api/blogs", require("./routes/blogRoutes"));
 app.use("/api/upload", require("./routes/uploadRoute"));
 
-// Improved Health Check
+// ✅ Improved Health Check
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "✅ Backend is running",
@@ -62,18 +64,20 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// 404 Handler
+// ✅ 404 Handler
 app.use((req, res) => res.status(404).json({ error: "Route Not Found" }));
 
-// Global Error Handler
+// ✅ Global Error Handler
 app.use((err, req, res, next) => {
   console.error(`❌ Global Error: ${err.message}`);
   res.status(500).json({ error: err.message });
 });
 
+// ✅ Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
 module.exports = app;
+
