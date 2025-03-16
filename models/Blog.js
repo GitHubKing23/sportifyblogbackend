@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-// ✅ Predefined list of categories (updated per your request)
+// ✅ Predefined list of categories
 const CATEGORIES = ["NBA", "NHL", "NFL", "MLB", "Esports", "Footy", "Other"];
 
 // ✅ Define Section Schema (each section can have optional images and captions)
@@ -27,7 +27,7 @@ const blogSchema = new mongoose.Schema(
         category: { 
             type: String, 
             required: true, 
-            enum: CATEGORIES,  // ✅ Restricted to only allowed categories
+            enum: CATEGORIES,  
             default: "Other"
         },
         author: { type: String, default: "Anonymous" },
@@ -35,7 +35,6 @@ const blogSchema = new mongoose.Schema(
             type: String,
             validate: {
                 validator: function(v) {
-                    // Allow empty or valid URLs or local uploads path
                     return !v || /^(https?:\/\/|\/uploads\/)/.test(v);
                 },
                 message: props => `${props.value} is not a valid feature image URL or local file path!`
@@ -45,17 +44,16 @@ const blogSchema = new mongoose.Schema(
             type: String,
             validate: {
                 validator: function(v) {
-                    // Allow empty or valid video URLs
                     return !v || /^(https?:\/\/)/.test(v);
                 },
                 message: props => `${props.value} is not a valid video URL!`
             }
         },
-        sections: [sectionSchema],  // ✅ Supports multiple sections with optional images
-        featured: { type: Boolean, default: false },  // ✅ Toggle featured status
-        isPublished: { type: Boolean, default: true } // ✅ Optional draft support
+        sections: [sectionSchema],  
+        featured: { type: Boolean, default: false },  
+        isPublished: { type: Boolean, default: true } 
     },
-    { timestamps: true } // ✅ Automatically adds createdAt & updatedAt fields
+    { timestamps: true, collection: "created_blog_posts" } // ✅ Explicitly set collection name
 );
 
 const Blog = mongoose.model("Blog", blogSchema);
