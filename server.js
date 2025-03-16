@@ -6,7 +6,11 @@ const morgan = require("morgan");
 const mongoose = require("mongoose");
 const path = require("path");
 
-dotenv.config();
+// ✅ Load environment variables correctly based on NODE_ENV
+dotenv.config({
+  path: process.env.NODE_ENV === "production" ? ".env.production" : ".env.development"
+});
+
 const app = express();
 
 // Connect to MongoDB
