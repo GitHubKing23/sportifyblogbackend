@@ -24,21 +24,33 @@ connectDB()
 app.use(express.json());
 app.use(morgan("dev"));
 
-// ✅ Optimized CORS Configuration
+// ✅ Improved CORS Configuration with Debugging
 const allowedOrigins = [
-  "https://sportifyinsider.com",  // Frontend domain
-  "https://api.sportifyinsider.com", // API subdomain
-  "http://localhost:5173",
+  "https://sportifyinsider.com",  // ✅ Frontend domain
+  "https://api.sportifyinsider.com", // ✅ API subdomain
+  "http://localhost:5173", // ✅ Local development
   "http://localhost:3001",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173"
-].filter(Boolean);
+];
 
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
+  origin: (origin, callback) => {
+    console.log("🌍 Incoming request from:", origin); // ✅ Debugging origin
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("❌ CORS Not Allowed"));
+    }
+  },
+  credentials: true, 
+  methods: "GET,POST,PUT,DELETE,OPTIONS",  // ✅ Allow necessary methods
+  allowedHeaders: "Content-Type,Authorization",  // ✅ Allow required headers
 }));
+
+// ✅ Handle Preflight Requests Correctly
+app.options("*", cors());
 
 // ✅ Disable caching globally
 app.use((req, res, next) => {
