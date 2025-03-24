@@ -6,10 +6,8 @@ const morgan = require("morgan");
 const mongoose = require("mongoose");
 const path = require("path");
 
-// ✅ Load environment variables correctly based on NODE_ENV
-dotenv.config({
-  path: process.env.NODE_ENV === "production" ? ".env.production" : ".env.development"
-});
+// ✅ Force load the correct .env.production file regardless of NODE_ENV
+dotenv.config({ path: path.resolve(__dirname, '.env.production') });
 
 const app = express();
 
@@ -26,9 +24,9 @@ app.use(morgan("dev"));
 
 // ✅ Improved CORS Configuration with Debugging
 const allowedOrigins = [
-  "https://sportifyinsider.com",  // ✅ Frontend domain
-  "https://api.sportifyinsider.com", // ✅ API subdomain
-  "http://localhost:5173", // ✅ Local development
+  "https://sportifyinsider.com",       // ✅ Frontend domain
+  "https://api.sportifyinsider.com",   // ✅ API subdomain
+  "http://localhost:5173",             // ✅ Local dev
   "http://localhost:3001",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -37,16 +35,16 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    console.log("🌍 Incoming request from:", origin); // ✅ Debugging origin
+    console.log("🌍 Incoming request from:", origin);
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error("❌ CORS Not Allowed"));
     }
   },
-  credentials: true, 
-  methods: "GET,POST,PUT,DELETE,OPTIONS",  // ✅ Allow necessary methods
-  allowedHeaders: "Content-Type,Authorization",  // ✅ Allow required headers
+  credentials: true,
+  methods: "GET,POST,PUT,DELETE,OPTIONS",
+  allowedHeaders: "Content-Type,Authorization",
 }));
 
 // ✅ Handle Preflight Requests Correctly
@@ -92,4 +90,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
