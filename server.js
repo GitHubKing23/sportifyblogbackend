@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -6,7 +7,7 @@ const morgan = require("morgan");
 const mongoose = require("mongoose");
 const path = require("path");
 
-// ✅ Force load the correct .env.production file regardless of NODE_ENV
+// ✅ Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env.production') });
 
 const app = express();
@@ -22,17 +23,11 @@ connectDB()
 app.use(express.json());
 app.use(morgan("dev"));
 
-// ✅ Improved CORS Configuration with Debugging
+// ✅ Improved CORS Configuration
 const allowedOrigins = [
-  "https://sportifyinsider.com",       // ✅ Frontend domain
-  "https://api.sportifyinsider.com",   // ✅ API subdomain
-  "http://localhost:5173",             // ✅ Local dev
-  "http://localhost:3001",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173"
+  "https://sportifyinsider.com", "https://api.sportifyinsider.com", 
+  "http://localhost:5173", "http://localhost:3001", "http://localhost:3000"
 ];
-
 app.use(cors({
   origin: (origin, callback) => {
     console.log("🌍 Incoming request from:", origin);
@@ -47,25 +42,21 @@ app.use(cors({
   allowedHeaders: "Content-Type,Authorization",
 }));
 
-// ✅ Handle Preflight Requests Correctly
+// ✅ Handle Preflight Requests
 app.options("*", cors());
 
-// ✅ Disable caching globally
-app.use((req, res, next) => {
-  res.set("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.set("Pragma", "no-cache");
-  res.set("Expires", "0");
-  next();
-});
-
-// ✅ Serve static files (e.g., uploads)
+// ✅ Serve static files (uploads)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ✅ API Routes
-app.use("/api/blogs", require("./routes/blogRoutes"));
+app.use("/api/blogs", (req, res, next) => {
+  console.log("🔍 Request received at /api/blogs");
+  next();
+}, require("./routes/blogRoutes")); // Debugging request reaching here
+
 app.use("/api/upload", require("./routes/uploadRoute"));
 
-// ✅ Improved Health Check
+// ✅ Health Check Route
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     status: "✅ Backend is running",
@@ -74,7 +65,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ✅ 404 Handler
+// ✅ 404 Handler for Undefined Routes
 app.use((req, res) => res.status(404).json({ error: "Route Not Found" }));
 
 // ✅ Global Error Handler
@@ -83,7 +74,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-// ✅ Start Server
+// ✅ Start the Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
