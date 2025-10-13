@@ -145,12 +145,20 @@ const fetchFeaturedBlogs = async (req, res) => {
 };
 
 /**
- * ✅ Create a new blog
+ * ✅ Create a new blog (with SEO fields)
  */
 const createBlog = async (req, res) => {
     try {
         console.log("📝 Creating a new blog...");
-        const newBlog = new Blog(req.body);
+        // Accept SEO fields: metaTitle, metaDescription, slug
+        const {
+            title, category, author, feature_image, video_url, sections, featured, isPublished,
+            metaTitle, metaDescription, slug
+        } = req.body;
+        const newBlog = new Blog({
+            title, category, author, feature_image, video_url, sections, featured, isPublished,
+            metaTitle, metaDescription, slug
+        });
         await newBlog.save();
 
         console.log("✅ New Blog Created:", newBlog);
@@ -166,14 +174,25 @@ const createBlog = async (req, res) => {
 };
 
 /**
- * ✅ Update an existing blog
+ * ✅ Update an existing blog (with SEO fields)
  */
 const updateBlog = async (req, res) => {
     try {
         const { id } = req.params;
         console.log("📝 Updating blog ID:", id);
 
-        const updatedBlog = await Blog.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+        // Accept SEO fields: metaTitle, metaDescription, slug
+        const updateFields = { ...req.body };
+        const allowedFields = [
+            "title", "category", "author", "feature_image", "video_url", "sections", "featured", "isPublished",
+            "metaTitle", "metaDescription", "slug"
+        ];
+        // Only allow whitelisted fields
+        Object.keys(updateFields).forEach(key => {
+            if (!allowedFields.includes(key)) delete updateFields[key];
+        });
+
+        const updatedBlog = await Blog.findByIdAndUpdate(id, updateFields, { new: true, runValidators: true });
 
         if (!updatedBlog) {
             console.warn("❌ Blog not found for update:", id);

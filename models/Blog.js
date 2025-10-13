@@ -20,7 +20,8 @@ const sectionSchema = new mongoose.Schema({
     caption: { type: String } // Optional caption for section images
 });
 
-// ✅ Define Blog Schema
+
+// ✅ Define Blog Schema with SEO fields
 const blogSchema = new mongoose.Schema(
     {
         title: { type: String, required: true },
@@ -49,6 +50,18 @@ const blogSchema = new mongoose.Schema(
                 message: props => `${props.value} is not a valid video URL!`
             }
         },
+        // --- SEO ENHANCEMENTS ---
+        metaTitle: { type: String, maxlength: 70 }, // For SEO title tag
+        metaDescription: { type: String, maxlength: 160 }, // For SEO meta description
+        slug: {
+            type: String,
+            lowercase: true,
+            trim: true,
+            unique: true,
+            sparse: true,
+            match: [/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'is invalid (use kebab-case, e.g. my-blog-title)']
+        },
+        // --- END SEO ENHANCEMENTS ---
         sections: [sectionSchema],  
         featured: { type: Boolean, default: false },  
         isPublished: { type: Boolean, default: true } 
