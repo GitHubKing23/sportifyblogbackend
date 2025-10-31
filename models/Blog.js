@@ -64,7 +64,22 @@ const blogSchema = new mongoose.Schema(
         // --- END SEO ENHANCEMENTS ---
         sections: [sectionSchema],  
         featured: { type: Boolean, default: false },  
-        isPublished: { type: Boolean, default: true } 
+        isPublished: { type: Boolean, default: true },
+        // --- Social features ---
+        likes: { type: Number, default: 0 },
+        comments: [
+            new mongoose.Schema({
+                user: { type: String, default: 'Anonymous' },
+                text: { type: String, required: true },
+                date: { type: Date, default: Date.now }
+            }, { _id: true })
+        ]
+        ,
+        // track which wallets/users have liked this post to prevent duplicates
+        likedBy: {
+            type: [String],
+            default: []
+        }
     },
     { timestamps: true, collection: "created_blog_posts" } // ✅ Explicitly set collection name
 );

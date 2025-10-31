@@ -8,9 +8,13 @@ const {
     updateBlog,
     deleteBlog,
     toggleFeaturedBlog,
+    likeBlog,
+    addComment,
+    getComments,
     fetchPaginatedBlogs
 } = require("../controllers/blogController");
 
+const authenticate = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // ✅ Debug Import
@@ -21,12 +25,19 @@ console.log("✅ Imported toggleFeaturedBlog:", typeof toggleFeaturedBlog === "f
 router.get("/", fetchAllBlogs);
 router.get("/category/:category", fetchBlogsByCategory); // ✅ Fetch blogs by category
 router.get("/featured", fetchFeaturedBlogs); // ✅ Fetch only featured blogs
-router.get("/:id", fetchBlog);
-router.post("/", createBlog);
-router.put("/:id", updateBlog);
-router.delete("/:id", deleteBlog);
-router.patch("/:id/feature", toggleFeaturedBlog); // ✅ Toggle featured blog
 router.get("/paginated", fetchPaginatedBlogs); // ✅ Fetch paginated blogs
+router.get("/:id", fetchBlog);
+
+// Social routes (likes & comments) - require authentication for write actions
+router.post("/:id/like", authenticate(), likeBlog);
+router.post("/:id/comment", authenticate(), addComment);
+router.get("/:id/comments", getComments);
+
+// Protected write routes - require admin wallet via JWT from auth backend
+router.post("/", authenticate(true), createBlog);
+router.put("/:id", authenticate(true), updateBlog);
+router.delete("/:id", authenticate(true), deleteBlog);
+router.patch("/:id/feature", authenticate(true), toggleFeaturedBlog); // ✅ Toggle featured blog
 
 // ✅ Debugging for route initialization
 console.log("✅ Blog routes successfully initialized.");

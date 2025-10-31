@@ -268,6 +268,99 @@ const toggleFeaturedBlog = async (req, res) => {
 };
 
 /**
+ * ❤️ Increment likes for a blog
+ */
+const likeBlog = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`➕ Liking blog ID: ${id}`);
+        // require authenticated user (route is protected but double-check)
+        if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+        const blog = await Blog.findById(id);
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
+
+        // determine user address from token (support multiple claim names)
+        const potential = (req.user && (req.user.address || req.user.ethereumAddress || req.user.wallet || req.user.sub || (req.user.user && req.user.user.address))) || '';
+        const userAddr = String(potential).toLowerCase();
+        if (!userAddr) return res.status(400).json({ error: 'User address not found in token' });
+
+        // prevent duplicate likes by the same user
+        blog.likedBy = blog.likedBy || [];
+        if (blog.likedBy.map(a => String(a).toLowerCase()).includes(userAddr)) {
+            console.log(`➖ User ${userAddr} already liked blog ${id}`);
+            disableCache(res);
+            return res.status(400).json({ error: 'Already liked', likes: blog.likes });
+        }
+
+        blog.likedBy.push(userAddr);
+        blog.likes = (blog.likes || 0) + 1;
+        await blog.save();
+
+        console.log(`✅ Blog likes updated: ${blog.likes}`);
+        disableCache(res);
+        res.status(200).json({ likes: blog.likes });
+    } catch (error) {
+        console.error('❌ Error liking blog:', { message: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to update likes', details: error.message });
+    }
+};
+
+/**
+ * 💬 Add a comment to a blog
+ */
+const addComment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { text } = req.body;
+
+        // determine author from authenticated user if available
+        let author = 'Anonymous';
+        if (req.user) {
+            // accept several claim names
+            author = (req.user.username) || (req.user.address) || (req.user.ethereumAddress) || (req.user.wallet) || author;
+        } else if (req.body.user) {
+            author = req.body.user;
+        }
+
+        console.log(`💬 Adding comment to blog ID: ${id} by user: ${author}`);
+
+        if (!text) return res.status(400).json({ error: 'Comment text is required' });
+
+        const blog = await Blog.findById(id);
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
+
+        blog.comments.push({ user: author, text });
+        await blog.save();
+
+        console.log('✅ Comment added');
+        disableCache(res);
+        res.status(201).json({ comments: blog.comments });
+    } catch (error) {
+        console.error('❌ Error adding comment:', { message: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to post comment', details: error.message });
+    }
+};
+
+/**
+ * 📄 Get comments for a blog
+ */
+const getComments = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`🔍 Fetching comments for blog ID: ${id}`);
+        const blog = await Blog.findById(id).select('comments');
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
+
+        disableCache(res);
+        res.status(200).json(blog.comments || []);
+    } catch (error) {
+        console.error('❌ Error fetching comments:', { message: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to load comments', details: error.message });
+    }
+};
+
+/**
  * ✅ Fetch blogs with pagination
  */
 const fetchPaginatedBlogs = async (req, res) => {
@@ -309,4 +402,7 @@ module.exports = {
     deleteBlog,
     toggleFeaturedBlog,
     fetchPaginatedBlogs,
+    likeBlog,
+    addComment,
+    getComments,
 };
