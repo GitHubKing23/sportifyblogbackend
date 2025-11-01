@@ -5,7 +5,6 @@ const dotenv = require("dotenv");
 dotenv.config({ path: require('path').resolve(__dirname, '.env.production') });
 const connectDB = require("./config/db");
 const morgan = require("morgan");
-const mongoose = require("mongoose");
 const path = require("path");
 
 // dotenv already loaded above to ensure DB config modules see environment variables
@@ -98,7 +97,8 @@ app.get("/api/health", async (req, res) => {
         dbStatus = `ArangoDB Disconnected ❌`;
       }
     } else {
-      dbStatus = mongoose.connection.readyState === 1 ? "MongoDB Connected ✅" : "MongoDB Disconnected ❌";
+      // MongoDB support has been removed — report that no DB is configured.
+      dbStatus = process.env.MONGO_URI ? "MongoDB configured but disabled in this build" : "No database configured";
     }
 
     res.status(200).json({
