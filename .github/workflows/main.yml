@@ -1,0 +1,4 @@
+cd ~/SportifyBlogBackend
+git fetch origin
+git checkout new-backend-code
+git pull origin new-backend-code
