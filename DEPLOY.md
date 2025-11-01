@@ -14,7 +14,7 @@ Quick checklist (run before cutover)
 - [ ] Install project deps: `npm ci`.
 - [ ] Run `npm run check-arango` to verify connectivity.
 - [ ] Run `npm run bootstrap-arango` to ensure the `blogposts` collection and indexes exist.
-- [ ] (Optional) Run migration: `npm run migrate-mongo-to-arango` only if you have a valid MONGO_URI and want to copy documents.
+<!-- Migration to Mongo removed: there is no automatic Mongo->Arango migration. If you need a one-time import, run a dedicated migration tool outside this deployment flow. -->
 - [ ] Start with PM2: `npm run start:prod`.
 - [ ] Configure Nginx as reverse proxy and enable TLS (Certbot recommended).
 - [ ] Configure backups and monitoring.
@@ -31,7 +31,7 @@ PORT=5001
 JWT_SECRET=keep_this_safe
 NODE_ENV=production
 
-If you still retain Mongo for migration, set `MONGO_URI` too; otherwise it may be left blank.
+This project now uses ArangoDB. Ensure Arango environment variables (ARANGO_*) are set on the server. There is no MONGO_URI required.
 
 PM2 vs systemd
 - PM2: use `pm2.config.js` included. Start: `pm2 start pm2.config.js --env production`.
@@ -67,7 +67,7 @@ Backups
 - Automate with a cron job or systemd timer; store dumps off-host (S3 or another backup server).
 
 Migration decision (current)
-- We will preserve the existing migration script in `scripts/migrate-mongo-to-arango.js` for one-time/manual migration or rollbacks, but we will not run it automatically on startup. After a verified migration and a suitable retention period, the `mongoose`/`mongodb` dependencies and migration scripts may be removed.
+- MongoDB support has been removed from this codebase. Any historical migration helpers have been disabled. If you need to import legacy Mongo data, prepare a one-time migration plan and run it manually from a secure environment.
 
 Monitoring & logs
 - Use PM2 logs or systemd/journald for logs. Configure log rotation and a centralized log system when possible (ELK, Grafana Loki, etc.).
