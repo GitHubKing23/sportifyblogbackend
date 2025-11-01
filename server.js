@@ -1,13 +1,14 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+// Load environment early so modules that read process.env (like config/db) see the vars
+dotenv.config({ path: require('path').resolve(__dirname, '.env.production') });
 const connectDB = require("./config/db");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
 const path = require("path");
 
-// ✅ Force load the correct .env.production file regardless of NODE_ENV
-dotenv.config({ path: path.resolve(__dirname, '.env.production') });
+// dotenv already loaded above to ensure DB config modules see environment variables
 
 const app = express();
 
