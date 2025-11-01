@@ -1,0 +1,33 @@
+name: 🚀 Deploy SportifyBlogBackend to VPS
+
+on:
+  push:
+    branches:
+      - new-backend-code   # trigger only on this branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧩 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            cd ~/SportifyBlogBackend
+            echo "🔄 Pulling latest code..."
+            git fetch origin
+            git checkout new-backend-code
+            git pull origin new-backend-code
+            echo "📦 Installing dependencies..."
+            npm install --omit=dev
+            echo "♻️ Restarting PM2 process..."
+            pm2 restart sportifyblog || pm2 start server.js --name sportifyblog
+            echo "✅ Deployment finished successfully!"
