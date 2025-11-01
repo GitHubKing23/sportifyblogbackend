@@ -1,5 +1,4 @@
-const Blog = require("../models/Blog");
-const mongoose = require("mongoose"); // Add mongoose for ObjectId validation
+const blogService = require("../services/blogServiceArango");
 
 /**
  * ✅ Helper function to set cache headers (Prevents 304 responses)
@@ -15,10 +14,9 @@ const disableCache = (res) => {
  */
 const fetchAllBlogs = async (req, res) => {
     try {
-        console.log("🔍 Fetching all blogs from MongoDB...");
-        const blogs = await Blog.find().sort({ createdAt: -1 });
-
-        console.log(`✅ Found ${blogs.length} blogs. IDs:`, blogs.map(blog => blog._id.toString()));
+        console.log("🔍 Fetching all blogs from ArangoDB...");
+        const blogs = await blogService.getAll();
+        console.log(`✅ Found ${blogs.length} blogs.`);
         disableCache(res);
         res.status(200).json(blogs);
     } catch (error) {
@@ -38,33 +36,9 @@ const fetchBlog = async (req, res) => {
         const { id } = req.params;
         console.log(`🔍 Fetching blog by ID: ${id}`);
 
-        if (!id) {
-            console.warn("⚠️ Blog ID is missing");
-            return res.status(400).json({ error: "Blog ID is required" });
-        }
-
-        // Validate ID length (MongoDB ObjectId should be 24 characters)
-        if (id.length !== 24) {
-            console.warn(`⚠️ Invalid ID length (expected 24 characters): ${id}`);
-            return res.status(400).json({ error: "Invalid blog ID length (must be 24 characters)" });
-        }
-
-        // Validate if the ID is a valid ObjectId
-        let blog;
-        if (mongoose.Types.ObjectId.isValid(id)) {
-            console.log(`✅ Valid ObjectId: ${id}`);
-            blog = await Blog.findById(id);
-        } else {
-            console.warn(`⚠️ Invalid ObjectId format: ${id}`);
-            return res.status(400).json({ error: "Invalid blog ID format" });
-        }
-
-        if (!blog) {
-            console.warn("❌ Blog not found:", id);
-            return res.status(404).json({ error: "Blog not found" });
-        }
-
-        console.log("✅ Blog retrieved:", blog);
+        if (!id) return res.status(400).json({ error: 'Blog ID is required' });
+        const blog = await blogService.getByKey(id);
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
         disableCache(res);
         res.status(200).json(blog);
     } catch (error) {
@@ -89,11 +63,7 @@ const fetchBlogsByCategory = async (req, res) => {
             return res.status(400).json({ error: "Category is required" });
         }
 
-        // ✅ Case-insensitive matching for category
-        const lowerCaseCategory = category.toLowerCase();
-        const blogs = await Blog.find({
-            category: { $regex: new RegExp(`^${lowerCaseCategory}$`, "i") }
-        }).sort({ createdAt: -1 });
+        const blogs = await blogService.getByCategory(category);
 
         if (!blogs.length) {
             console.warn(`⚠️ No blogs found for category: '${category}'`);
@@ -124,7 +94,7 @@ const fetchBlogsByCategory = async (req, res) => {
 const fetchFeaturedBlogs = async (req, res) => {
     try {
         console.log("🔍 Fetching featured blogs...");
-        const featuredBlogs = await Blog.find({ featured: true }).sort({ createdAt: -1 });
+        const featuredBlogs = await blogService.getFeatured();
 
         if (!featuredBlogs.length) {
             console.warn("⚠️ No featured blogs found.");
@@ -155,15 +125,11 @@ const createBlog = async (req, res) => {
             title, category, author, feature_image, video_url, sections, featured, isPublished,
             metaTitle, metaDescription, slug
         } = req.body;
-        const newBlog = new Blog({
-            title, category, author, feature_image, video_url, sections, featured, isPublished,
-            metaTitle, metaDescription, slug
-        });
-        await newBlog.save();
-
-        console.log("✅ New Blog Created:", newBlog);
+        const doc = { title, category, author, feature_image, video_url, sections, featured, isPublished, metaTitle, metaDescription, slug };
+        const created = await blogService.create(doc);
+        console.log('✅ New Blog Created:', created._key || created._id || created);
         disableCache(res);
-        res.status(201).json({ message: "Blog created successfully", blog: newBlog });
+        res.status(201).json({ message: 'Blog created successfully', blog: created });
     } catch (error) {
         console.error("❌ Error creating blog:", {
             message: error.message,
@@ -192,16 +158,10 @@ const updateBlog = async (req, res) => {
             if (!allowedFields.includes(key)) delete updateFields[key];
         });
 
-        const updatedBlog = await Blog.findByIdAndUpdate(id, updateFields, { new: true, runValidators: true });
-
-        if (!updatedBlog) {
-            console.warn("❌ Blog not found for update:", id);
-            return res.status(404).json({ error: "Blog not found" });
-        }
-
-        console.log("✅ Blog Updated:", updatedBlog);
+        const updated = await blogService.update(id, updateFields);
+        if (!updated) return res.status(404).json({ error: 'Blog not found' });
         disableCache(res);
-        res.status(200).json({ message: "Blog updated successfully", blog: updatedBlog });
+        res.status(200).json({ message: 'Blog updated successfully', blog: updated });
     } catch (error) {
         console.error("❌ Error updating blog:", {
             message: error.message,
@@ -218,17 +178,10 @@ const deleteBlog = async (req, res) => {
     try {
         const { id } = req.params;
         console.log("🗑 Deleting blog ID:", id);
-
-        const deletedBlog = await Blog.findByIdAndDelete(id);
-
-        if (!deletedBlog) {
-            console.warn("❌ Blog not found for deletion:", id);
-            return res.status(404).json({ error: "Blog not found" });
-        }
-
-        console.log("✅ Blog Deleted:", deletedBlog._id);
+        const ok = await blogService.remove(id);
+        if (!ok) return res.status(404).json({ error: 'Blog not found' });
         disableCache(res);
-        res.status(200).json({ message: "Blog deleted successfully" });
+        res.status(200).json({ message: 'Blog deleted successfully' });
     } catch (error) {
         console.error("❌ Error deleting blog:", {
             message: error.message,
@@ -245,19 +198,10 @@ const toggleFeaturedBlog = async (req, res) => {
     try {
         const { id } = req.params;
         console.log("🌟 Toggling featured status for blog ID:", id);
-
-        const blog = await Blog.findById(id);
-        if (!blog) {
-            console.warn("❌ Blog not found:", id);
-            return res.status(404).json({ error: "Blog not found" });
-        }
-
-        blog.featured = !blog.featured; // ✅ Toggle featured status
-        await blog.save();
-
-        console.log(`✅ Blog ${blog.featured ? "Featured" : "Unfeatured"}:`, blog);
+        const updated = await blogService.toggleFeatured(id);
+        if (!updated) return res.status(404).json({ error: 'Blog not found' });
         disableCache(res);
-        res.status(200).json({ message: `Blog ${blog.featured ? "featured" : "unfeatured"} successfully`, blog });
+        res.status(200).json({ message: `Blog ${updated.featured ? 'featured' : 'unfeatured'} successfully`, blog: updated });
     } catch (error) {
         console.error("❌ Error toggling featured status:", {
             message: error.message,
@@ -276,30 +220,13 @@ const likeBlog = async (req, res) => {
         console.log(`➕ Liking blog ID: ${id}`);
         // require authenticated user (route is protected but double-check)
         if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-
-        const blog = await Blog.findById(id);
-        if (!blog) return res.status(404).json({ error: 'Blog not found' });
-
-        // determine user address from token (support multiple claim names)
         const potential = (req.user && (req.user.address || req.user.ethereumAddress || req.user.wallet || req.user.sub || (req.user.user && req.user.user.address))) || '';
         const userAddr = String(potential).toLowerCase();
         if (!userAddr) return res.status(400).json({ error: 'User address not found in token' });
-
-        // prevent duplicate likes by the same user
-        blog.likedBy = blog.likedBy || [];
-        if (blog.likedBy.map(a => String(a).toLowerCase()).includes(userAddr)) {
-            console.log(`➖ User ${userAddr} already liked blog ${id}`);
-            disableCache(res);
-            return res.status(400).json({ error: 'Already liked', likes: blog.likes });
-        }
-
-        blog.likedBy.push(userAddr);
-        blog.likes = (blog.likes || 0) + 1;
-        await blog.save();
-
-        console.log(`✅ Blog likes updated: ${blog.likes}`);
+        const result = await blogService.like(id, userAddr);
+        if (result.alreadyLiked) return res.status(400).json({ error: 'Already liked', likes: result.likes });
         disableCache(res);
-        res.status(200).json({ likes: blog.likes });
+        res.status(200).json({ likes: result.likes });
     } catch (error) {
         console.error('❌ Error liking blog:', { message: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to update likes', details: error.message });
@@ -324,18 +251,10 @@ const addComment = async (req, res) => {
         }
 
         console.log(`💬 Adding comment to blog ID: ${id} by user: ${author}`);
-
         if (!text) return res.status(400).json({ error: 'Comment text is required' });
-
-        const blog = await Blog.findById(id);
-        if (!blog) return res.status(404).json({ error: 'Blog not found' });
-
-        blog.comments.push({ user: author, text });
-        await blog.save();
-
-        console.log('✅ Comment added');
+        const comments = await blogService.addComment(id, author, text);
         disableCache(res);
-        res.status(201).json({ comments: blog.comments });
+        res.status(201).json({ comments });
     } catch (error) {
         console.error('❌ Error adding comment:', { message: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to post comment', details: error.message });
@@ -349,11 +268,9 @@ const getComments = async (req, res) => {
     try {
         const { id } = req.params;
         console.log(`🔍 Fetching comments for blog ID: ${id}`);
-        const blog = await Blog.findById(id).select('comments');
-        if (!blog) return res.status(404).json({ error: 'Blog not found' });
-
+        const comments = await blogService.getComments(id);
         disableCache(res);
-        res.status(200).json(blog.comments || []);
+        res.status(200).json(comments || []);
     } catch (error) {
         console.error('❌ Error fetching comments:', { message: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to load comments', details: error.message });
@@ -370,18 +287,9 @@ const fetchPaginatedBlogs = async (req, res) => {
         limit = parseInt(limit) || 10;
 
         console.log(`🔍 Fetching blogs with pagination: Page ${page}, Limit ${limit}`);
-        const blogs = await Blog.find()
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(limit);
-
-        const totalBlogs = await Blog.countDocuments();
+        const { items, total } = await blogService.getPaginated(page, limit);
         disableCache(res);
-        res.status(200).json({
-            blogs,
-            currentPage: page,
-            totalPages: Math.ceil(totalBlogs / limit),
-        });
+        res.status(200).json({ blogs: items, currentPage: page, totalPages: Math.ceil(total / limit) });
     } catch (error) {
         console.error("❌ Error fetching paginated blogs:", {
             message: error.message,

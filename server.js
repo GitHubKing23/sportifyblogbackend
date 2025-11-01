@@ -11,13 +11,32 @@ dotenv.config({ path: path.resolve(__dirname, '.env.production') });
 
 const app = express();
 
-// ✅ Connect to MongoDB
-connectDB()
-  .then(() => console.log("✅ MongoDB Connected Successfully"))
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Failed:", err.message);
+// Database connection: prefer ArangoDB if configured, otherwise fall back to MongoDB
+if (process.env.ARANGO_URL && process.env.ARANGO_DB) {
+  // Initialize ArangoDB connection (config/arango.js handles auth/database selection)
+  try {
+    const arango = require('./config/arango');
+    console.log(`🔗 Using ArangoDB at ${process.env.ARANGO_URL}, DB: ${process.env.ARANGO_DB}`);
+    // Run bootstrap to ensure collection and indexes exist (non-blocking startup)
+    const { bootstrap } = require('./scripts/bootstrap-arango');
+    bootstrap({ migrate: false }).then(result => {
+      console.log('✅ Arango bootstrap result:', result);
+    }).catch(err => {
+      console.warn('⚠️ Arango bootstrap failed:', err.message || err);
+    });
+  } catch (err) {
+    console.error('❌ Failed to initialize ArangoDB:', err.message || err);
     process.exit(1);
-  });
+  }
+} else {
+  // ✅ Connect to MongoDB if Arango not configured
+  connectDB()
+    .then(() => console.log("✅ MongoDB Connected Successfully"))
+    .catch((err) => {
+      console.error("❌ MongoDB Connection Failed:", err.message);
+      process.exit(1);
+    });
+}
 
 app.use(express.json());
 app.use(morgan("dev"));
@@ -66,12 +85,29 @@ app.use("/api/blogs", require("./routes/blogRoutes"));
 app.use("/api/upload", require("./routes/uploadRoute"));
 
 // ✅ Improved Health Check
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    status: "✅ Backend is running",
-    database: mongoose.connection.readyState === 1 ? "Connected ✅" : "Disconnected ❌",
-    timestamp: new Date().toISOString(),
-  });
+app.get("/api/health", async (req, res) => {
+  try {
+    let dbStatus = 'Unknown';
+    if (process.env.ARANGO_URL && process.env.ARANGO_DB) {
+      const arango = require('./config/arango');
+      try {
+        const ver = await arango.version();
+        dbStatus = `ArangoDB ${ver.version} Connected ✅`;
+      } catch (e) {
+        dbStatus = `ArangoDB Disconnected ❌`;
+      }
+    } else {
+      dbStatus = mongoose.connection.readyState === 1 ? "MongoDB Connected ✅" : "MongoDB Disconnected ❌";
+    }
+
+    res.status(200).json({
+      status: "✅ Backend is running",
+      database: dbStatus,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'Error', error: err.message });
+  }
 });
 
 // ✅ 404 Handler
