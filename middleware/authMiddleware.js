@@ -5,6 +5,21 @@ const jwt = require('jsonwebtoken');
  * - Verifies Bearer JWT and, if requireAdmin, ensures token contains an admin wallet.
  */
 module.exports = function authenticate(requireAdmin = false) {
+  // Fast-path: allow tests or temporary debugging to bypass auth by setting
+  // DISABLE_AUTH=true in the environment. When disabled we attach a minimal
+  // `req.user` object so controllers that expect an ethereumAddress won't fail.
+  if (process.env.DISABLE_AUTH === 'true') {
+    return (req, res, next) => {
+      const adminAddr = (process.env.ADMIN_WALLET_ADDRESS || '').toLowerCase();
+      if (requireAdmin && adminAddr) {
+        req.user = { ethereumAddress: adminAddr };
+      } else {
+        req.user = { anonymous: true };
+      }
+      return next();
+    };
+  }
+
   return (req, res, next) => {
     try {
       const authHeader = req.headers.authorization || '';
