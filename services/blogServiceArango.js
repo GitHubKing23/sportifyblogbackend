@@ -58,7 +58,10 @@ async function create(doc) {
     isPublished: doc.isPublished !== undefined ? !!doc.isPublished : true,
     sections: doc.sections || [],
     createdAt: doc.createdAt || now,
-    updatedAt: doc.updatedAt || now
+    updatedAt: doc.updatedAt || now,
+    authorId: doc.authorId || null,
+    authorEmail: doc.authorEmail || null,
+    authorName: doc.authorName || doc.author || 'Unknown Author'
   }, doc);
   const meta = await collection.save(toSave, { returnNew: true });
   return meta.new;
@@ -91,11 +94,11 @@ async function toggleFeatured(key) {
   return update(key, { featured: !blog.featured });
 }
 
-async function like(key, userAddress) {
-  if (!userAddress) throw new Error('userAddress required');
+async function like(key, userIdentifier) {
+  if (!userIdentifier) throw new Error('user identifier required');
   const blog = await getByKey(key);
   if (!blog) throw new Error('Blog not found');
-  const lower = String(userAddress).toLowerCase();
+  const lower = String(userIdentifier).toLowerCase();
   const likedBy = Array.isArray(blog.likedBy) ? blog.likedBy.map(a => String(a).toLowerCase()) : [];
   if (likedBy.includes(lower)) return { alreadyLiked: true, likes: blog.likes || 0 };
   const newLikedBy = (blog.likedBy || []).concat([lower]);

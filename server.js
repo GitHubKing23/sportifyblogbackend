@@ -44,6 +44,7 @@ app.use(morgan("dev"));
 // ✅ Improved CORS Configuration with Debugging
 const allowedOrigins = [
   "https://sportifyinsider.com",       // ✅ Frontend domain
+  "https://cms.sportifyinsider.com",   // ✅ CMS dashboard
   "https://api.sportifyinsider.com",   // ✅ API subdomain
   "http://localhost:5173",             // ✅ Local dev
   "http://localhost:3001",

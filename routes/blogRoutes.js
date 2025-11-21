@@ -14,7 +14,7 @@ const {
     fetchPaginatedBlogs
 } = require("../controllers/blogController");
 
-const authenticate = require('../middleware/authMiddleware');
+const { verifyToken, requireWriterOrAdmin, requireAdmin } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // ✅ Debug Import
@@ -28,16 +28,16 @@ router.get("/featured", fetchFeaturedBlogs); // ✅ Fetch only featured blogs
 router.get("/paginated", fetchPaginatedBlogs); // ✅ Fetch paginated blogs
 router.get("/:id", fetchBlog);
 
-// Social routes (likes & comments) - require authentication for write actions
-router.post("/:id/like", authenticate(), likeBlog);
-router.post("/:id/comment", authenticate(), addComment);
+// Social routes require Authorization: Bearer <accessToken>
+router.post("/:id/like", verifyToken, likeBlog);
+router.post("/:id/comment", verifyToken, addComment);
 router.get("/:id/comments", getComments);
 
-// Protected write routes - require admin wallet via JWT from auth backend
-router.post("/", authenticate(true), createBlog);
-router.put("/:id", authenticate(true), updateBlog);
-router.delete("/:id", authenticate(true), deleteBlog);
-router.patch("/:id/feature", authenticate(true), toggleFeaturedBlog); // ✅ Toggle featured blog
+// Protected write routes (Authorization: Bearer <accessToken>)
+router.post("/", verifyToken, requireWriterOrAdmin, createBlog);
+router.put("/:id", verifyToken, requireWriterOrAdmin, updateBlog);
+router.delete("/:id", verifyToken, requireAdmin, deleteBlog);
+router.patch("/:id/feature", verifyToken, requireWriterOrAdmin, toggleFeaturedBlog); // ✅ Toggle featured blog
 
 // ✅ Debugging for route initialization
 console.log("✅ Blog routes successfully initialized.");

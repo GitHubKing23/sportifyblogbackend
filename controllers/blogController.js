@@ -114,18 +114,43 @@ const fetchFeaturedBlogs = async (req, res) => {
     }
 };
 
+const getAuthorMeta = (user = {}, fallbackName = "Unknown Author") => {
+    if (!user) return { authorId: null, authorEmail: null, authorName: fallbackName };
+    return {
+        authorId: user.userId || null,
+        authorEmail: user.email || null,
+        authorName: user.name || user.email || fallbackName,
+    };
+};
+
 /**
  * ✅ Create a new blog (with SEO fields)
  */
 const createBlog = async (req, res) => {
     try {
         console.log("📝 Creating a new blog...");
-        // Accept SEO fields: metaTitle, metaDescription, slug
         const {
             title, category, author, feature_image, video_url, sections, featured, isPublished,
             metaTitle, metaDescription, slug
         } = req.body;
-        const doc = { title, category, author, feature_image, video_url, sections, featured, isPublished, metaTitle, metaDescription, slug };
+
+        const authorMeta = getAuthorMeta(req.user, author);
+        const doc = {
+            title,
+            category,
+            author: author || authorMeta.authorName,
+            feature_image,
+            video_url,
+            sections,
+            featured,
+            isPublished,
+            metaTitle,
+            metaDescription,
+            slug,
+            authorId: authorMeta.authorId,
+            authorEmail: authorMeta.authorEmail,
+            authorName: authorMeta.authorName,
+        };
         const created = await blogService.create(doc);
         console.log('✅ New Blog Created:', created._key || created._id || created);
         disableCache(res);
@@ -157,6 +182,12 @@ const updateBlog = async (req, res) => {
         Object.keys(updateFields).forEach(key => {
             if (!allowedFields.includes(key)) delete updateFields[key];
         });
+
+        const authorMeta = getAuthorMeta(req.user, updateFields.author);
+        updateFields.authorId = authorMeta.authorId;
+        updateFields.authorEmail = authorMeta.authorEmail;
+        updateFields.authorName = authorMeta.authorName;
+        if (!updateFields.author) updateFields.author = authorMeta.authorName;
 
         const updated = await blogService.update(id, updateFields);
         if (!updated) return res.status(404).json({ error: 'Blog not found' });
@@ -218,12 +249,11 @@ const likeBlog = async (req, res) => {
     try {
         const { id } = req.params;
         console.log(`➕ Liking blog ID: ${id}`);
-        // require authenticated user (route is protected but double-check)
+        // identify user uniquely by userId/email for like tracking
         if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-        const potential = (req.user && (req.user.address || req.user.ethereumAddress || req.user.wallet || req.user.sub || (req.user.user && req.user.user.address))) || '';
-        const userAddr = String(potential).toLowerCase();
-        if (!userAddr) return res.status(400).json({ error: 'User address not found in token' });
-        const result = await blogService.like(id, userAddr);
+        const identifier = (req.user.userId || req.user.email || '').toString().toLowerCase();
+        if (!identifier) return res.status(400).json({ error: 'User identifier missing in token' });
+        const result = await blogService.like(id, identifier);
         if (result.alreadyLiked) return res.status(400).json({ error: 'Already liked', likes: result.likes });
         disableCache(res);
         res.status(200).json({ likes: result.likes });
@@ -244,8 +274,7 @@ const addComment = async (req, res) => {
         // determine author from authenticated user if available
         let author = 'Anonymous';
         if (req.user) {
-            // accept several claim names
-            author = (req.user.username) || (req.user.address) || (req.user.ethereumAddress) || (req.user.wallet) || author;
+            author = req.user.name || req.user.email || author;
         } else if (req.body.user) {
             author = req.body.user;
         }
